@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YT_TRANSCRIPT — веб-панель</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #0A0C0E;
+    --panel: #14171B;
+    --panel-raised: #1B1F24;
+    --line: #262B31;
+    --text: #E7E9EA;
+    --dim: #808990;
+    --dimmer: #565D63;
+    --amber: #FFC857;
+    --amber-dim: #8A6E2E;
+    --teal: #52D6C4;
+    --error: #FF6B6B;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--void);
+    background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255,200,87,0.06), transparent);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+    padding: 32px 20px 60px;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 28px; padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand .dot {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--amber);
+    display: inline-block; box-shadow: 0 0 10px rgba(255,200,87,0.6); transform: translateY(-2px);
+  }
+  h1 { font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 22px; letter-spacing: -0.02em; }
+  h1 span { color: var(--amber); }
+  .tagline { font-size: 13px; color: var(--dim); font-family: 'JetBrains Mono', monospace; }
+  .status-pill {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 5px 10px;
+    border-radius: 20px; border: 1px solid var(--line); color: var(--dim);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .status-pill .led { width: 6px; height: 6px; border-radius: 50%; background: var(--dimmer); }
+  .status-pill.live .led { background: var(--teal); box-shadow: 0 0 6px var(--teal); }
+
+  .grid { display: grid; grid-template-columns: 380px 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px; }
+  .panel-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--dim); margin-bottom: 18px; display: flex; align-items: center; gap: 8px;
+  }
+  .panel-title::before { content: ''; width: 14px; height: 1px; background: var(--amber-dim); }
+
+  .mode-toggle {
+    display: grid; grid-template-columns: 1fr 1fr; background: var(--void);
+    border: 1px solid var(--line); border-radius: 8px; padding: 3px; margin-bottom: 20px;
+  }
+  .mode-toggle button {
+    background: transparent; border: none; color: var(--dim); font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; font-weight: 500; padding: 9px 0; border-radius: 6px; cursor: pointer; transition: all 0.15s ease;
+  }
+  .mode-toggle button.active { background: var(--panel-raised); color: var(--amber); box-shadow: 0 0 0 1px var(--line); }
+
+  .field { margin-bottom: 16px; }
+  .field:last-child { margin-bottom: 0; }
+  label { display: block; font-size: 12px; color: var(--dim); margin-bottom: 6px; font-weight: 500; }
+  label .hint { color: var(--dimmer); font-weight: 400; margin-left: 4px; }
+  input[type="text"], input[type="number"], select {
+    width: 100%; background: var(--void); border: 1px solid var(--line); color: var(--text);
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 10px 12px; border-radius: 6px;
+    outline: none; transition: border-color 0.15s ease;
+  }
+  input::placeholder { color: var(--dimmer); }
+  input:focus, select:focus { border-color: var(--amber-dim); }
+  select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23808990'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center; cursor: pointer;
+  }
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .fetch-btn {
+    width: 100%; margin-top: 20px; background: var(--amber); color: #14110A; border: none;
+    font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 13px; padding: 12px 0;
+    border-radius: 8px; cursor: pointer; transition: filter 0.15s ease;
+  }
+  .fetch-btn:hover { filter: brightness(1.08); }
+  .fetch-btn:disabled { background: var(--dimmer); color: var(--dim); cursor: wait; }
+
+  /* Results panel */
+  .terminal { background: #0D0F11; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; min-height: 480px; display: flex; flex-direction: column; }
+  .terminal-bar { display: flex; align-items: center; gap: 7px; padding: 10px 14px; background: var(--panel-raised); border-bottom: 1px solid var(--line); }
+  .terminal-bar .tl-dot { width: 9px; height: 9px; border-radius: 50%; }
+  .tl-dot:nth-child(1) { background: #FF5F57; }
+  .tl-dot:nth-child(2) { background: #FEBC2E; }
+  .tl-dot:nth-child(3) { background: #28C840; }
+  .terminal-bar .path { margin-left: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dimmer); }
+
+  .terminal-body { padding: 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.75; flex: 1; overflow-y: auto; max-height: 560px; }
+  .placeholder { color: var(--dimmer); }
+  .placeholder .prompt-sign { color: var(--teal); }
+
+  .video-entry { margin-bottom: 6px; }
+  .video-entry .ts { color: var(--amber-dim); }
+  .video-entry .txt { color: var(--text); }
+
+  .channel-item { border-bottom: 1px solid var(--line); padding: 10px 0; }
+  .channel-item:last-child { border-bottom: none; }
+  .channel-item .ch-title { color: var(--text); font-size: 12.5px; margin-bottom: 3px; }
+  .channel-item .ch-status { font-size: 11px; }
+  .channel-item .ch-status.ok { color: var(--teal); }
+  .channel-item .ch-status.fail { color: var(--error); }
+
+  .error-line { color: var(--error); }
+
+  .terminal-footer { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; border-top: 1px solid var(--line); background: var(--panel-raised); }
+  .copy-btn { background: transparent; border: 1px solid var(--amber-dim); color: var(--amber); font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 7px 14px; border-radius: 6px; cursor: pointer; transition: all 0.15s ease; }
+  .copy-btn:hover { background: rgba(255,200,87,0.08); }
+  .copy-btn.copied { color: var(--teal); border-color: var(--teal); }
+  .copy-btn:disabled { opacity: 0.35; cursor: default; }
+  .req-note { font-size: 11px; color: var(--dimmer); font-family: 'JetBrains Mono', monospace; }
+
+  .spinner {
+    display: inline-block; width: 12px; height: 12px; border: 2px solid var(--dimmer);
+    border-top-color: var(--amber); border-radius: 50%; animation: spin 0.7s linear infinite; margin-right: 8px; vertical-align: -2px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="brand"><span class="dot"></span><h1>yt_<span>transcript</span>.py</h1></div>
+      <div class="tagline">// веб-панель — запрос идёт на локальный сервер, который дёргает YouTube</div>
+    </div>
+    <div class="status-pill" id="status-pill"><span class="led"></span><span id="status-text">сервер не проверен</span></div>
+  </header>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-title">Параметры</div>
+
+      <div class="mode-toggle">
+        <button id="mode-video" class="active" onclick="setMode('video')">video</button>
+        <button id="mode-channel" onclick="setMode('channel')">channel</button>
+      </div>
+
+      <div class="field">
+        <label id="url-label">Ссылка на видео <span class="hint">или ID</span></label>
+        <input type="text" id="url" placeholder="https://youtu.be/dQw4w9WgXcQ">
+      </div>
+
+      <div class="field">
+        <label>Языки <span class="hint">через запятую, по приоритету</span></label>
+        <input type="text" id="lang" value="ru,en">
+      </div>
+
+      <div class="row-2">
+        <div class="field">
+          <label>Формат</label>
+          <select id="format">
+            <option value="txt">txt</option>
+            <option value="plain">plain</option>
+            <option value="srt">srt</option>
+            <option value="json">json</option>
+          </select>
+        </div>
+        <div class="field" id="limit-field" style="display:none;">
+          <label>Лимит видео</label>
+          <input type="number" id="limit" placeholder="20">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Прокси <span class="hint">если YouTube заблокирован</span></label>
+        <input type="text" id="proxy" placeholder="socks5://127.0.0.1:1080">
+      </div>
+
+      <button class="fetch-btn" id="fetch-btn" onclick="fetchTranscript()">получить транскрипт</button>
+    </div>
+
+    <div>
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="tl-dot"></span><span class="tl-dot"></span><span class="tl-dot"></span>
+          <span class="path">127.0.0.1:5000</span>
+        </div>
+        <div class="terminal-body" id="output">
+          <div class="placeholder"><span class="prompt-sign">$</span> жду параметры и нажатие «получить транскрипт»...</div>
+        </div>
+        <div class="terminal-footer">
+          <span class="req-note" id="req-note">—</span>
+          <button class="copy-btn" id="copy-btn" onclick="copyOutput()" disabled>скопировать</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let mode = 'video';
+let lastPlainOutput = '';
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('mode-video').classList.toggle('active', m === 'video');
+  document.getElementById('mode-channel').classList.toggle('active', m === 'channel');
+  const label = document.getElementById('url-label');
+  label.innerHTML = m === 'video'
+    ? 'Ссылка на видео <span class="hint">или ID</span>'
+    : 'Ссылка на канал <span class="hint">/@name</span>';
+  document.getElementById('url').placeholder = m === 'video'
+    ? 'https://youtu.be/dQw4w9WgXcQ'
+    : 'https://www.youtube.com/@channel';
+  document.getElementById('limit-field').style.display = m === 'channel' ? 'block' : 'none';
+  document.getElementById('format').value = m === 'video' ? 'txt' : 'plain';
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function checkHealth() {
+  try {
+    const r = await fetch('/api/video', { method: 'OPTIONS' });
+    setStatus(true);
+  } catch (e) {
+    setStatus(false);
+  }
+}
+
+function setStatus(ok) {
+  const pill = document.getElementById('status-pill');
+  const text = document.getElementById('status-text');
+  pill.classList.toggle('live', ok);
+  text.textContent = ok ? 'сервер отвечает' : 'сервер недоступен';
+}
+
+async function fetchTranscript() {
+  const btn = document.getElementById('fetch-btn');
+  const output = document.getElementById('output');
+  const copyBtn = document.getElementById('copy-btn');
+  const reqNote = document.getElementById('req-note');
+
+  const url = document.getElementById('url').value.trim();
+  const lang = document.getElementById('lang').value.trim() || 'en';
+  const format = document.getElementById('format').value;
+  const proxy = document.getElementById('proxy').value.trim();
+  const limit = document.getElementById('limit').value.trim();
+
+  if (!url) {
+    output.innerHTML = `<div class="error-line">Сначала укажи ${mode === 'video' ? 'ссылку на видео' : 'ссылку на канал'}.</div>`;
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'получаю...';
+  copyBtn.disabled = true;
+  output.innerHTML = `<div class="placeholder"><span class="spinner"></span>отправляю запрос на сервер...</div>`;
+  reqNote.textContent = mode === 'video' ? 'POST /api/video' : 'POST /api/channel';
+
+  try {
+    if (mode === 'video') {
+      const res = await fetch('/api/video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, lang, format, proxy }),
+      });
+      const data = await res.json();
+      setStatus(true);
+      if (!res.ok) {
+        output.innerHTML = `<div class="error-line">${escapeHtml(data.error || 'Неизвестная ошибка')}</div>`;
+        copyBtn.disabled = true;
+      } else {
+        lastPlainOutput = data.output;
+        output.innerHTML = `<pre style="white-space:pre-wrap;font-family:inherit;color:var(--text);">${escapeHtml(data.output)}</pre>`;
+        copyBtn.disabled = false;
+      }
+    } else {
+      const res = await fetch('/api/channel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, lang, format, proxy, limit }),
+      });
+      const data = await res.json();
+      setStatus(true);
+      if (!res.ok) {
+        output.innerHTML = `<div class="error-line">${escapeHtml(data.error || 'Неизвестная ошибка')}</div>`;
+        copyBtn.disabled = true;
+      } else {
+        const chunks = [];
+        let combined = '';
+        data.results.forEach(item => {
+          if (item.ok) {
+            chunks.push(`<div class="channel-item"><div class="ch-title">${escapeHtml(item.title)}</div><div class="ch-status ok">✓ получено, ${item.output.length} симв.</div></div>`);
+            combined += `\n${'='.repeat(80)}\n${item.title}\nhttps://www.youtube.com/watch?v=${item.id}\n${'='.repeat(80)}\n${item.output}\n`;
+          } else {
+            chunks.push(`<div class="channel-item"><div class="ch-title">${escapeHtml(item.title)}</div><div class="ch-status fail">✗ ${escapeHtml(item.error)}</div></div>`);
+          }
+        });
+        lastPlainOutput = combined.trim();
+        output.innerHTML = chunks.join('') || '<div class="placeholder">Видео не найдены.</div>';
+        copyBtn.disabled = !combined.trim();
+      }
+    }
+  } catch (e) {
+    setStatus(false);
+    output.innerHTML = `<div class="error-line">Не удалось достучаться до сервера (${escapeHtml(String(e))}). Убедись, что запущен "python app.py".</div>`;
+    copyBtn.disabled = true;
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'получить транскрипт';
+}
+
+function copyOutput() {
+  navigator.clipboard.writeText(lastPlainOutput).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'скопировано';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'скопировать'; btn.classList.remove('copied'); }, 1600);
+  });
+}
+
+checkHealth();
+</script>
+</body>
+</html>
